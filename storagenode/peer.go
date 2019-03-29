@@ -6,6 +6,8 @@ package storagenode
 import (
 	"context"
 
+	"storj.io/storj/storagenode/collector"
+
 	"github.com/zeebo/errs"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -99,6 +101,7 @@ type Peer struct {
 		Inspector *inspector.Endpoint
 		Monitor   *monitor.Service
 		Sender    *orders.Sender
+		Collector *collector.Service
 	}
 }
 
@@ -229,6 +232,13 @@ func New(log *zap.Logger, full *identity.FullIdentity, db DB, config Config) (*P
 			peer.DB.Orders(),
 			config.Storage2.Sender,
 		)
+
+		peer.Storage2.Collector = collector.NewService(
+			log.Named("piecestore:collector"),
+			peer.Storage2.Store,
+			peer.DB.PieceInfo(),
+			config.Storage.CollectorInterval,
+		)
 	}
 
 	return peer, nil
@@ -261,7 +271,9 @@ func (peer *Peer) Run(ctx context.Context) error {
 		peer.Log.Sugar().Infof("Private server started on %s", peer.PrivateAddr())
 		return ignoreCancel(peer.Server.Run(ctx))
 	})
-
+	group.Go(func() error {
+		return ignoreCancel(peer.Storage2.Collector.Run(ctx))
+	})
 	return group.Wait()
 }
 
