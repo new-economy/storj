@@ -252,7 +252,8 @@ func (peer *Peer) Run(ctx context.Context) error {
 	group, ctx := errgroup.WithContext(ctx)
 
 	group.Go(func() error {
-		return peer.exponentialBackoffBootstrap(ctx, baseWaitInterval, maxWaitDuration, 0, nil)
+		// return ignoreCancel(peer.Kademlia.Service.Bootstrap(ctx))
+		return exponentialBackoff(ctx, baseWaitInterval, maxWaitDuration, peer.Kademlia.Service.Bootstrap)
 	})
 	group.Go(func() error {
 		return ignoreCancel(peer.Kademlia.Service.Run(ctx))
@@ -278,24 +279,31 @@ func (peer *Peer) Run(ctx context.Context) error {
 	return group.Wait()
 }
 
-func (peer *Peer) exponentialBackoffBootstrap(ctx context.Context, waitInterval, maxWait time.Duration, attempts int, combined error) error {
-	if waitInterval*2 > maxWait {
-		return errs.Combine(combined, Error.New("unable to bootstrap to network after %d attempts", attempts))
-	}
-	if attempts == 1 {
-		time.Sleep(waitInterval)
-	}
-	if attempts > 1 {
-		waitInterval = waitInterval * 2
-		time.Sleep(waitInterval)
-	}
+func exponentialBackoff(ctx context.Context, waitInterval, maxWait time.Duration, toExec func(context.Context) error) error {
 
-	err := peer.Kademlia.Service.Bootstrap(ctx)
+	var errList errs.Group
+	err := toExec(ctx)
 	if err != nil {
-		errs.Combine(combined, err)
-		attempts++
-		peer.exponentialBackoffBootstrap(ctx, waitInterval, maxWait, attempts, combined)
+		errList.Add(err)
 	}
+	// if waitInterval*2 > maxWait {
+	// 	return errs.Combine(combined, Error.New("unable to bootstrap to network after %d attempts", attempts))
+	// }
+	// if attempts == 1 {
+	// 	time.Sleep(waitInterval)
+	// }
+	// if attempts > 1 {
+	// 	waitInterval = waitInterval * 2
+	// 	time.Sleep(waitInterval)
+	// }
+
+	// err := peer.Kademlia.Service.Bootstrap(ctx)
+	// if err != nil {
+	// 	errs.Combine(combined, err)
+	// 	attempts++
+	// 	peer.exponentialBackoffBootstrap(ctx, waitInterval, maxWait, attempts, combined)
+	// }
+	// return nil
 	return nil
 }
 
