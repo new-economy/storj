@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -45,8 +46,9 @@ const (
 
 // DB is a piece store database
 type DB struct {
-	mu sync.Mutex
-	db *sql.DB
+	mu     sync.Mutex
+	db     *sql.DB
+	dbPath string
 }
 
 // Agreement is a struct that contains a bandwidth agreement and the associated signature
@@ -66,7 +68,8 @@ func Open(DBPath string) (db *DB, err error) {
 		return nil, Error.Wrap(err)
 	}
 	db = &DB{
-		db: sqlite,
+		db:     sqlite,
+		dbPath: DBPath,
 	}
 
 	return db, nil
@@ -204,6 +207,32 @@ func (db *DB) Migration() *migrate.Migration {
 				Action: migrate.SQL{
 					`CREATE INDEX IF NOT EXISTS idx_bwa_serial ON bandwidth_agreements (serial_num)`,
 				},
+			},
+			{
+				Description: "Clean pieces stored using ttl",
+				Version:     4,
+				Action: migrate.Func(func(log *zap.Logger, mdb migrate.DB, tx *sql.Tx) error {
+					path := db.dbPath
+					if path != "" {
+						path = filepath.Dir(path)
+						files, err := ioutil.ReadDir(path)
+						if err != nil {
+							return err
+						}
+
+						// iterate thru files list
+						for _, f := range files {
+							if info, err := os.Stat(filepath.Join(path, f.Name())); err == nil && info.IsDir() {
+								err = os.RemoveAll(filepath.Join(path, f.Name()))
+								if err != nil {
+									zap.S().Warnf("Unable to delete %v, %v", filepath.Join(path, f.Name()), err)
+								}
+
+							}
+						}
+					}
+					return nil
+				}),
 			},
 		},
 	}
