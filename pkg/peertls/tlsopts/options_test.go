@@ -117,15 +117,15 @@ func TestNewOptions(t *testing.T) {
 func TestOptions_ServerOption_Peer_CA_Whitelist(t *testing.T) {
 	ctx := testcontext.New(t)
 
-	planet, err := testplanet.New(t, 0, 2, 0)
-	require.NoError(t, err)
-
-	planet.Start(ctx)
-	defer ctx.Check(planet.Shutdown)
-
-	target := planet.StorageNodes[1].Local()
-
 	testidentity.CompleteIdentityVersionsTest(t, func(t *testing.T, version storj.IDVersion, ident *identity.FullIdentity) {
+		planet, err := testplanet.NewWithIdentityVersion(t, &version, 0, 2, 0)
+		require.NoError(t, err)
+
+		planet.Start(ctx)
+		defer ctx.Check(planet.Shutdown)
+
+		target := planet.StorageNodes[1].Local()
+
 		opts, err := tlsopts.NewOptions(ident, tlsopts.Config{
 			PeerIDVersions: "1,2",
 		})
