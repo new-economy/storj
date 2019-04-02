@@ -210,7 +210,7 @@ func (db *DB) Migration() *migrate.Migration {
 			},
 			{
 				Description: "Clean pieces stored using ttl",
-				Version:     4,
+				Version:     5,
 				Action: migrate.Func(func(log *zap.Logger, mdb migrate.DB, tx *sql.Tx) error {
 					path := db.dbPath
 					if path != "" {
@@ -225,7 +225,7 @@ func (db *DB) Migration() *migrate.Migration {
 							if info, err := os.Stat(filepath.Join(path, f.Name())); err == nil && info.IsDir() {
 								err = os.RemoveAll(filepath.Join(path, f.Name()))
 								if err != nil {
-									zap.S().Warnf("Unable to delete %v, %v", filepath.Join(path, f.Name()), err)
+									log.Warn("unable to delete ", zap.String("pieceid", filepath.Join(path, f.Name())), zap.Error(err))
 								}
 
 							}

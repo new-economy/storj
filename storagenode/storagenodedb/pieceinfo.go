@@ -8,9 +8,8 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/zeebo/errs"
-
 	"github.com/gogo/protobuf/proto"
+	"github.com/zeebo/errs"
 
 	"storj.io/storj/pkg/pb"
 	"storj.io/storj/pkg/storj"
@@ -108,22 +107,21 @@ func (db *pieceinfo) SpaceUsed(ctx context.Context) (int64, error) {
 
 // GetExpired gets orders that are expired and were created before some time
 func (db *pieceinfo) GetExpired(ctx context.Context, expiredAt time.Time) (info []pieces.Info, err error) {
-	var getExpiredSQL = `SELECT satellite_id, piece_id, piece_size, piece_expiration, uplink_piece_hash, uplink_cert_id 
-		FROM pieceinfo WHERE piece_expiration < ?`
+	var getExpiredSQL = `SELECT satellite_id, piece_id FROM pieceinfo WHERE piece_expiration < ? ORDER BY satellite_id`
 	rows, err := db.db.QueryContext(ctx, db.Rebind(getExpiredSQL), expiredAt)
 	if err != nil {
-		return nil, err
+		return nil, ErrInfo.Wrap(err)
 	}
 	defer func() { err = errs.Combine(err, rows.Close()) }()
 	for i := 0; rows.Next(); i++ {
 		pi := pieces.Info{}
-		err = rows.Scan(&pi.SatelliteID, &pi.PieceID, &pi.PieceSize, &pi.PieceExpiration, &pi.UplinkPieceHash, &pi.Uplink)
+		err = rows.Scan(&pi.SatelliteID, &pi.PieceID)
 		if err != nil {
 			break
 		}
 		info = append(info, pi)
 	}
-	return info, err
+	return info, ErrInfo.Wrap(err)
 }
 
 // DeleteExpired deletes expired piece information.
