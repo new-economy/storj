@@ -568,6 +568,10 @@ func (planet *Planet) newStorageNodes(count int, whitelistedSatelliteIDs []strin
 					Timeout:  time.Hour,
 				},
 			},
+			Retry: storagenode.RetryConfig{
+				BaseWait: 1 * time.Second,
+				MaxWait:  30 * time.Second,
+			},
 		}
 		if planet.config.Reconfigure.StorageNode != nil {
 			planet.config.Reconfigure.StorageNode(i, &config)
